@@ -12,6 +12,8 @@ use ssh_key::KnownHosts;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::{env, io};
+use fuzzy_matcher::FuzzyMatcher;
+use fuzzy_matcher::skim::SkimMatcherV2;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -35,6 +37,8 @@ struct Cli {
 
 fn main() {
     let args = Cli::parse();
+
+    let matcher = SkimMatcherV2::default();
 
     let search: String = args.search;
     let ssh_user: String = args.login_name;
@@ -64,12 +68,12 @@ fn main() {
         let address = &host_patterns[0];
         if !seen_addresses.contains(&address) {
             seen_addresses.push(address.to_string());
-            if search == "" || address.contains(&search) {
+            if search == "" || matcher.fuzzy_match(address, &search).is_some() {
                 println!(
                     "{}{} {}",
                     format!("{:>2}", iterator.to_string().bright_blue()),
                     ":".bright_blue(),
-                    address
+                    address,
                 );
                 iterator += 1;
                 displayed_addresses.push(address.to_string());
@@ -88,7 +92,11 @@ fn main() {
         println!("Choice?");
         let mut input_choice = String::new();
         io::stdin().read_line(&mut input_choice).unwrap();
-        int_choice = input_choice.trim().parse::<usize>().unwrap();
+        let int_parsed = input_choice.trim().parse::<usize>();
+        match int_parsed {
+            Ok(number) => int_choice = number,
+            Err(_) => panic!("Please provide a valid number."),
+        } 
     }
     let chosen_address = &displayed_addresses[int_choice - 1];
 
